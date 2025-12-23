@@ -1,0 +1,130 @@
+{
+  "name": "crm-pro",
+  "version": "1.0.0",
+  "description": "CRM Pro.cc - Plateforme de Gestion Hospitalière et CRM avec Power BI et Blueprint UI",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md}\"",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    
+    "@blueprintjs/core": "^5.10.0",
+    "@blueprintjs/datetime": "^5.3.0",
+    "@blueprintjs/select": "^5.2.0",
+    "@blueprintjs/table": "^5.2.0",
+    "@blueprintjs/icons": "^5.8.0",
+    "@blueprintjs/popover2": "^2.1.0",
+    "@blueprintjs/timezone": "^5.2.0",
+    
+    "powerbi-client": "^2.23.1",
+    "powerbi-client-react": "^1.4.0",
+    "@azure/msal-browser": "^3.7.0",
+    "@azure/msal-react": "^2.0.10",
+    
+    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/auth-helpers-react": "^0.5.0",
+    
+    "@stripe/stripe-js": "^4.10.0",
+    "@stripe/react-stripe-js": "^2.8.1",
+    
+    "recharts": "^2.15.0",
+    "lucide-react": "^0.468.0",
+    
+    "axios": "^1.6.5",
+    "date-fns": "^3.0.0",
+    "date-fns-tz": "^2.0.0",
+    "react-transition-group": "^4.4.5",
+    
+    "zustand": "^5.0.2",
+    "immer": "^10.0.3",
+    
+    "react-hook-form": "^7.49.3",
+    "zod": "^3.22.4",
+    "@hookform/resolvers": "^3.3.4",
+    
+    "react-query": "^3.39.3",
+    "@tanstack/react-query": "^5.17.9",
+    "@tanstack/react-query-devtools": "^5.17.9",
+    
+    "socket.io-client": "^4.7.4",
+    
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.0",
+    
+    "jwt-decode": "^4.0.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/react-transition-group": "^4.4.10",
+    "@types/bcryptjs": "^2.4.6",
+    
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^6.0.3",
+    "typescript": "^5.6.2",
+    
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.33",
+    
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    
+    "prettier": "^3.2.4",
+    "prettier-plugin-tailwindcss": "^0.5.11",
+    
+    "vitest": "^1.2.0",
+    "@vitest/ui": "^1.2.0",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.2.0",
+    "@testing-library/user-event": "^14.5.2",
+    
+    "msw": "^2.0.11",
+    
+    "prisma": "^5.8.0",
+    "@prisma/client": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "hospital-management",
+    "crm",
+    "healthcare",
+    "react",
+    "typescript",
+    "blueprint-ui",
+    "power-bi",
+    "supabase",
+    "stripe"
+  ],
+  "author": "CRM Pro.cc Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/crm-pro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/crm-pro/issues"
+  },
+  "homepage": "https://crmpro.cc"
+}

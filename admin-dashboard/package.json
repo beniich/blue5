@@ -1,0 +1,13 @@
+﻿{
+  "name": "admin-dashboard-pro",
+  "version": "1.0.0",
+  "description": "Dashboard d'administration centralisé pour School 1cc et CRM Pro.cc",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5175",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+  }
+}

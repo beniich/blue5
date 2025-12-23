@@ -1,0 +1,212 @@
+# ========================================
+# Docker Compose Configuration
+# School 1cc & CRM Pro.cc
+# ========================================
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # School 1cc - Application Scolaire
+  # ==========================================
+  school-1cc:
+    container_name: school-1cc
+    build:
+      context: ./school-1cc
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    environment:
+      - NODE_ENV=production
+      - VITE_APP_NAME=School 1cc
+      - VITE_APP_VERSION=1.0.0
+    volumes:
+      - school-data:/app/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.school.rule=Host(`school.localhost`)"
+      - "traefik.http.services.school.loadbalancer.server.port=80"
+
+  # ==========================================
+  # CRM Pro.cc - Application Hospitalière
+  # ==========================================
+  crm-pro:
+    container_name: crm-pro
+    build:
+      context: ./crm-pro
+      dockerfile: Dockerfile
+    ports:
+      - "5174:80"
+    environment:
+      - NODE_ENV=production
+      - VITE_APP_NAME=CRM Pro.cc
+      - VITE_APP_VERSION=1.0.0
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY}
+    volumes:
+      - crm-data:/app/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crm.rule=Host(`crm.localhost`)"
+      - "traefik.http.services.crm.loadbalancer.server.port=80"
+
+  # ==========================================
+  # PostgreSQL Database (pour CRM Pro.cc)
+  # ==========================================
+  postgres:
+    container_name: postgres-db
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=crm_pro
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./crm-pro/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Redis Cache (pour CRM Pro.cc)
+  # ==========================================
+  redis:
+    container_name: redis-cache
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Nginx Reverse Proxy (optionnel)
+  # ==========================================
+  nginx:
+    container_name: nginx-proxy
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - school-1cc
+      - crm-pro
+
+  # ==========================================
+  # Traefik Reverse Proxy (alternative)
+  # ==========================================
+  traefik:
+    container_name: traefik-proxy
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+    ports:
+      - "8080:8080"  # Dashboard Traefik
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/certificates:/certificates
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # ==========================================
+  # Monitoring - Prometheus (optionnel)
+  # ==========================================
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - app-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # ==========================================
+  # Monitoring - Grafana (optionnel)
+  # ==========================================
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+# ==========================================
+# Volumes persistants
+# ==========================================
+volumes:
+  school-data:
+    driver: local
+  crm-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  nginx-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+# ==========================================
+# Réseau
+# ==========================================
+networks:
+  app-network:
+    driver: bridge
