@@ -1,0 +1,704 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & AUTHORIZATION
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatar        String?
+  isActive      Boolean  @default(true)
+  emailVerified Boolean  @default(false)
+  
+  // Relations
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  
+  // Relations
+  users       User[]
+  permissions RolePermission[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  module      String
+  action      String
+  
+  // Relations
+  roles       RolePermission[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime   @default(now())
+  
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// AUDIT & LOGGING
+// ============================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  module    String
+  entity    String?
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+}
+
+// ============================================
+// SETTINGS MODULE
+// ============================================
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  description String?
+  isSystem    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("settings")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  
+  createdAt DateTime @default(now())
+  
+  @@map("sessions")
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model TwoFactorAuth {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  secret    String
+  enabled   Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("two_factor_auth")
+}
+
+model Backup {
+  id        String   @id @default(cuid())
+  filename  String
+  path      String
+  size      Int
+  type      String
+  status    String   @default("completed")
+  
+  createdBy String?
+  createdAt DateTime @default(now())
+  
+  @@map("backups")
+  @@index([createdAt])
+}
+
+// ============================================
+// DOCUMENTS MODULE
+// ============================================
+
+model Folder {
+  id          String   @id @default(cuid())
+  name        String
+  parentId    String?
+  path        String
+  
+  parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[] @relation("FolderHierarchy")
+  documents   Document[]
+  
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("folders")
+  @@index([parentId])
+  @@index([createdBy])
+}
+
+model Document {
+  id            String    @id @default(cuid())
+  name          String
+  originalName  String
+  mimeType      String
+  size          Int
+  path          String
+  thumbnail     String?
+  folderId      String?
+  tags          String[]
+  isArchived    Boolean   @default(false)
+  
+  folder        Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  versions      DocumentVersion[]
+  permissions   DocumentPermission[]
+  activities    DocumentActivity[]
+  shares        DocumentShare[]
+  
+  uploadedBy    String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("documents")
+  @@index([folderId])
+  @@index([uploadedBy])
+  @@index([isArchived])
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  version     Int
+  path        String
+  size        Int
+  comment     String?
+  
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  createdBy   String
+  createdAt   DateTime @default(now())
+  
+  @@map("document_versions")
+  @@index([documentId])
+  @@unique([documentId, version])
+}
+
+enum DocumentPermissionLevel {
+  READ
+  WRITE
+  DELETE
+  ADMIN
+  SHARE
+}
+
+model DocumentPermission {
+  id          String                   @id @default(cuid())
+  documentId  String
+  userId      String?
+  roleId      String?
+  level       DocumentPermissionLevel
+  
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("document_permissions")
+  @@index([documentId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model DocumentActivity {
+  id          String   @id @default(cuid())
+  documentId  String
+  action      String
+  details     Json?
+  userId      String
+  
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("document_activities")
+  @@index([documentId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DocumentShare {
+  id          String   @id @default(cuid())
+  documentId  String
+  token       String   @unique
+  expiresAt   DateTime?
+  maxDownloads Int?
+  downloads   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  createdBy   String
+  createdAt   DateTime @default(now())
+  
+  @@map("document_shares")
+  @@index([documentId])
+  @@index([token])
+}
+
+// ============================================
+// BILLING MODULE
+// ============================================
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  type        String   @default("service") // service, physical
+  category    String   // tuition, canteen, transport, uniform, etc.
+  isActive    Boolean  @default(true)
+  
+  invoiceItems InvoiceItem[]
+  subscriptions StudentSubscription[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("products")
+}
+
+model Tax {
+  id          String   @id @default(cuid())
+  name        String
+  rate        Decimal  @db.Decimal(5, 2) // Percentage
+  description String?
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("taxes")
+}
+
+model Discount {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  type        String   // percentage, fixed
+  value       Decimal  @db.Decimal(10, 2)
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  
+  invoices    Invoice[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("discounts")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  number        String        @unique // INV-2024-0001
+  studentId     String
+  parentId      String?
+  
+  subtotal      Decimal       @db.Decimal(10, 2)
+  taxTotal      Decimal       @db.Decimal(10, 2)
+  discountTotal Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  balance       Decimal       @db.Decimal(10, 2) // Amount remaining to be paid
+  
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime
+  issueDate     DateTime      @default(now())
+  paidDate      DateTime?
+  
+  notes         String?
+  terms         String?
+  
+  items         InvoiceItem[]
+  payments      Payment[]
+  discount      Discount?     @relation(fields: [discountId], references: [id])
+  discountId    String?
+  
+  // Relations to User model would be here if extended, using studentId/parentId
+  
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@map("invoices")
+  @@index([studentId])
+  @@index([parentId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  productId   String?
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+  
+  @@map("invoice_items")
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  BANK_TRANSFER
+  CREDIT_CARD
+  MOBILE_MONEY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  number        String        @unique // PAY-2024-0001
+  invoiceId     String?
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  status        PaymentStatus @default(COMPLETED)
+  transactionId String?       // External transaction ID (Stripe, OM, etc.)
+  
+  date          DateTime      @default(now())
+  notes         String?
+  
+  invoice       Invoice?      @relation(fields: [invoiceId], references: [id])
+  
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  
+  @@map("payments")
+  @@index([invoiceId])
+  @@index([date])
+}
+
+model StudentSubscription {
+  id          String   @id @default(cuid())
+  studentId   String
+  productId   String   // The service (tuition, canteen)
+  
+  startDate   DateTime
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  
+  amount      Decimal  @db.Decimal(10, 2)
+  frequency   String   // MONTHLY, YEARLY, TRIMESTER
+  
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("student_subscriptions")
+  @@index([studentId])
+  @@index([isActive])
+}
+
+// ============================================
+// GRADES & EXAMS MODULE
+// ============================================
+
+model AcademicYear {
+  id          String   @id @default(cuid())
+  name        String   // 2023-2024
+  startDate   DateTime
+  endDate     DateTime
+  isCurrent   Boolean  @default(false)
+  
+  terms       Term[]
+  classes     Class[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("academic_years")
+}
+
+model Term {
+  id              String       @id @default(cuid())
+  name            String       // Semestre 1, Trimestre 2
+  academicYearId  String
+  startDate       DateTime
+  endDate         DateTime
+  isCurrent       Boolean      @default(false)
+  
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  exams           Exam[]
+  reportCards     ReportCard[]
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  @@map("terms")
+  @@index([academicYearId])
+}
+
+model Class {
+  id              String       @id @default(cuid())
+  name            String       // 6ème A, Terminale S
+  level           String       // Collège, Lycée
+  academicYearId  String
+  mainTeacherId   String?      // Professeur principal
+  
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  courses         Course[]
+  
+  // Students relation would be handled via User model with a classId or enrollment model
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  @@map("classes")
+  @@index([academicYearId])
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   // Mathématiques, Histoire-Géo
+  code        String   @unique // MATH, HIST
+  coefficient Float    @default(1.0)
+  description String?
+  color       String?  // For UI
+  
+  courses     Course[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("subjects")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  name        String?  // Optional custom name
+  subjectId   String
+  classId     String
+  teacherId   String
+  
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  class       Class    @relation(fields: [classId], references: [id])
+  
+  exams       Exam[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("courses")
+  @@index([classId])
+  @@index([teacherId])
+}
+
+enum ExamType {
+  HOMEWORK
+  QUIZ
+  EXAM
+  FINAL
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  name        String
+  type        ExamType
+  courseId    String
+  termId      String
+  date        DateTime
+  maxScore    Float    @default(20.0)
+  coefficient Float    @default(1.0)
+  isPublished Boolean  @default(false)
+  
+  course      Course   @relation(fields: [courseId], references: [id])
+  term        Term     @relation(fields: [termId], references: [id])
+  grades      Grade[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("exams")
+  @@index([courseId])
+  @@index([termId])
+}
+
+model Grade {
+  id          String   @id @default(cuid())
+  examId      String
+  studentId   String
+  value       Float
+  comment     String?
+  
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("grades")
+  @@index([examId])
+  @@index([studentId])
+  @@unique([examId, studentId])
+}
+
+model ReportCard {
+  id          String   @id @default(cuid())
+  studentId   String
+  termId      String
+  
+  average     Float
+  rank        Int?
+  appreciation String?
+  status      String   @default("draft") // draft, published
+  
+  term        Term     @relation(fields: [termId], references: [id])
+  
+  generatedAt DateTime @default(now())
+  
+  @@map("report_cards")
+  @@index([studentId])
+  @@index([termId])
+  @@unique([studentId, termId])
+}
+
+// ============================================
+// TIMETABLE MODULE
+// ============================================
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String   // Salle 101, Labo Chimie
+  capacity    Int
+  type        String   // classroom, lab, gym
+  
+  sessions    TimetableSession[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("rooms")
+}
+
+model TimeSlot {
+  id          String   @id @default(cuid())
+  name        String   // M1, M2, S1
+  startTime   String   // 08:00
+  endTime     String   // 09:00
+  order       Int
+  
+  sessions    TimetableSession[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("time_slots")
+  @@unique([startTime, endTime])
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model TimetableSession {
+  id          String   @id @default(cuid())
+  courseId    String
+  classId     String
+  teacherId   String
+  roomId      String?
+  timeSlotId  String
+  dayOfWeek   DayOfWeek
+  
+  course      Course   @relation(fields: [courseId], references: [id])
+  class       Class    @relation(fields: [classId], references: [id])
+  room        Room?    @relation(fields: [roomId], references: [id])
+  timeSlot    TimeSlot @relation(fields: [timeSlotId], references: [id])
+  
+  // No relation to User here to avoid circular dep issues in this snippet context, 
+  // but teacher should be linked to User model in real app.
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("timetable_sessions")
+  @@index([classId])
+  @@index([teacherId])
+  @@index([roomId])
+  @@index([dayOfWeek])
+  @@unique([classId, dayOfWeek, timeSlotId]) // A class can have only one session at a time
+  // Also ideally: teacher + day + slot unique constraint
+}
